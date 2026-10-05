@@ -1,0 +1,55 @@
+// Order Module Schema (Order, OrderItem, Enums)
+
+enum OrderStatus {
+  pending
+  processing
+  shipped
+  delivered
+  cancelled
+
+  @@map("order_status_enum")
+}
+
+enum PaymentStatus {
+  unpaid
+  paid
+  failed
+  refunded
+
+  @@map("payment_status_enum")
+}
+
+model Order {
+  id              Int           @id @default(autoincrement())
+  userId          Int           @map("user_id")
+  status          OrderStatus   @default(pending)
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
+  shippingAddress String        @map("shipping_address") @db.Text
+  paymentStatus   PaymentStatus @default(unpaid) @map("payment_status")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  orderItems      OrderItem[]
+
+  @@index([userId], map: "idx_orders_user_id")
+  @@map("orders")
+}
+
+model OrderItem {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @map("order_id")
+  productId Int      @map("product_id")
+  quantity  Int
+  unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId], map: "idx_order_items_order_id")
+  @@index([productId], map: "idx_order_items_product_id")
+  @@map("order_items")
+}

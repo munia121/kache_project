@@ -1,0 +1,25 @@
+// User Module Schema & Role Enum
+
+enum Role {
+  customer
+  admin
+
+  @@map("role_enum")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  fullName     String    @map("full_name") @db.VarChar(150)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  role         Role      @default(customer)
+  phone        String?   @db.VarChar(20)
+  address      String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  orders       Order[]
+
+  @@map("users")
+}

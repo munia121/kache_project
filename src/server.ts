@@ -1,22 +1,55 @@
-import dotenv from 'dotenv';
-
-// Load environment variables before loading app or other modules
-dotenv.config();
-
-console.log('server.ts is loaded');
-
+import { Server } from 'http';
 import app from './app';
-import { testDbConnection } from './config/db';
+import config from './config';
+import { prisma, pool } from './config/prismaClient';
 
-const PORT = process.env.PORT || 5000;
+let server: Server;
 
-const startServer = async (): Promise<void> => {
-  // Test database connection
-  await testDbConnection();
+const main = async () => {
+  try {
+    server = app.listen(config.port, () => {
+      console.log(`🚀 Server is running on port ${config.port}`);
+      console.log(`📍 Health Check: http://localhost:${config.port}/health`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  const exitHandler = async () => {
+    try {
+      if (server) {
+        server.close(async () => {
+          console.log('Server closed gracefully');
+          await prisma.$disconnect();
+          await pool.end();
+          process.exit(1);
+        });
+      } else {
+        await prisma.$disconnect();
+        await pool.end();
+        process.exit(1);
+      }
+    } catch (err) {
+      console.error('Error during shutdown:', err);
+      process.exit(1);
+    }
+  };
+
+  const unexpectedErrorHandler = (error: unknown) => {
+    console.error('Unexpected error detected:', error);
+    exitHandler();
+  };
+
+  process.on('uncaughtException', unexpectedErrorHandler);
+  process.on('unhandledRejection', unexpectedErrorHandler);
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Closing server gracefully...');
+    if (server) {
+      server.close();
+    }
   });
 };
 
-startServer();
+main();
