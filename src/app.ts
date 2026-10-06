@@ -46,6 +46,7 @@ app.get('/health', (req: Request, res: Response) => {
 // ==========================================
 // Application API Routes
 // ==========================================
+app.use('/api', router);
 app.use('/api/v1', router);
 
 // ==========================================

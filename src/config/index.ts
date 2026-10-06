@@ -15,4 +15,6 @@ export default {
   smtp_user: process.env.SMTP_USER || '',
   smtp_pass: process.env.SMTP_PASS || '',
   smtp_from: process.env.SMTP_FROM || 'no-reply@mobile-banking.com',
+  jwt_secret: process.env.JWT_SECRET || 'default_jwt_secret_key_12345',
+  jwt_expires_in: process.env.JWT_EXPIRES_IN || '7d',
 };

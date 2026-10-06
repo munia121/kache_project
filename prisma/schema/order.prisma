@@ -30,7 +30,7 @@ model Order {
   updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   // Relations
-  user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // user            User          @relation(fields: [userId], references: [id], onDelete: Restrict)
   orderItems      OrderItem[]
 
   @@index([userId], map: "idx_orders_user_id")
