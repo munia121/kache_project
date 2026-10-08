@@ -1,25 +1,38 @@
+import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { Role, UserStatus } from '@prisma/client';
 import prisma from '../../config/prismaClient';
 import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
-import { hashPassword, generateToken } from '../../utils/auth';
+import { hashPassword } from '../../utils/auth';
+import sendEmail from '../../utils/sendEmail';
 
 /**
  * Register a new user
- * Handles fullName, phone, password, and optional email
+ * Handles fullName, phone, password, and email with 6-digit OTP verification
  */
 export const register = catchAsync(async (req: Request, res: Response): Promise<void> => {
   const { fullName, phone, password, email, area, address } = req.body;
 
   // Basic validation
-  if (!fullName || !phone || !password) {
-    throw new AppError(400, 'fullName, phone, and password are required fields');
+  if (!fullName || !phone || !password || !email) {
+    throw new AppError(400, 'fullName, phone, password, and email are required fields');
   }
 
   const normalizedPhone = String(phone).trim();
+  const normalizedEmail = String(email).trim().toLowerCase();
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    throw new AppError(400, 'Invalid email address format');
+  }
+
+  // ============================================================================
+  // [TESTING MODE] - Commented out so you can test registration repeatedly with the same email
+  // ============================================================================
+  /*
   // Check if phone already exists
   const existingUserByPhone = await prisma.user.findUnique({
     where: { phone: normalizedPhone },
@@ -29,30 +42,39 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
     throw new AppError(409, 'User with this phone number already exists');
   }
 
-  // Check if optional email already exists
-  if (email) {
-    const normalizedEmail = String(email).trim().toLowerCase();
-    const existingUserByEmail = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
+  // Check if email already exists
+  const existingUserByEmail = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  });
 
-    if (existingUserByEmail) {
-      throw new AppError(409, 'User with this email already exists');
-    }
+  if (existingUserByEmail) {
+    throw new AppError(409, 'User with this email already exists');
   }
+  */
+
+  // [TESTING HELPER]: Delete previous record for this email or phone so re-registering succeeds without database unique constraint errors
+  await prisma.otp.deleteMany({
+    where: { email: normalizedEmail },
+  });
+  await prisma.user.deleteMany({
+    where: {
+      OR: [{ email: normalizedEmail }, { phone: normalizedPhone }],
+    },
+  });
 
   // Hash password
   const passwordHash = await hashPassword(password);
 
-  // Save new user in database
+  // Save new user in database (isEmailVerified defaults to false)
   const newUser = await prisma.user.create({
     data: {
       fullName: String(fullName).trim(),
       phone: normalizedPhone,
-      email: email ? String(email).trim().toLowerCase() : null,
+      email: normalizedEmail,
       passwordHash,
       role: Role.USER,
       status: UserStatus.ACTIVE,
+      isEmailVerified: false,
       area: area ? String(area).trim() : null,
       address: address ? String(address).trim() : null,
     },
@@ -64,6 +86,7 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
       role: true,
       status: true,
       avatar: true,
+      isEmailVerified: true,
       area: true,
       address: true,
       createdAt: true,
@@ -71,20 +94,50 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
     },
   });
 
-  // Generate JWT token
-  const token = generateToken({
-    id: newUser.id,
-    phone: newUser.phone,
-    role: newUser.role,
+  // Generate secure 6-digit random OTP
+  const otpCode = crypto.randomInt(100000, 1000000).toString();
+
+  // Expiration set to exactly 3 minutes from now
+  const expiresAt = new Date(Date.now() + 3 * 60 * 1000);
+
+  // Delete any existing OTPs for this email to maintain clean state
+  await prisma.otp.deleteMany({
+    where: { email: normalizedEmail },
   });
+
+  // Save fresh OTP in database
+  await prisma.otp.create({
+    data: {
+      email: normalizedEmail,
+      code: otpCode,
+      expiresAt,
+    },
+  });
+
+  // Send OTP email via nodemailer
+  try {
+    await sendEmail({
+      to: normalizedEmail,
+      subject: 'কাছে (Kache) - ইমেইল ভেরিফিকেশন ওটিপি কোড',
+      otp: otpCode,
+      title: 'ইমেইল যাচাইকরণ ওটিপি কোড',
+      purpose: 'কাছে (Kache) লোকাল মার্কেটপ্লেসে স্বাগতম! আপনার অ্যাকাউন্ট নিশ্চিত করতে এবং রেজিস্ট্রেশন সম্পন্ন করতে নিচের ওটিপি (OTP) কোডটি ব্যবহার করুন:',
+    });
+  } catch (error) {
+    console.error('Failed to send verification email:', error);
+  }
+
+  // Return response without token (include devOtp in response if SMTP_USER not set in dev)
+  const isDevWithoutSmtp =
+    process.env.NODE_ENV !== 'production' && !process.env.SMTP_USER;
 
   sendResponse(res, {
     statusCode: 201,
     success: true,
-    message: 'User registered successfully',
+    message: 'Registration successful. Please verify the OTP sent to your email.',
     data: {
       user: newUser,
-      token,
+      ...(isDevWithoutSmtp ? { devOtp: otpCode } : {}),
     },
   });
 });

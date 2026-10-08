@@ -25,6 +25,7 @@ export const getMe = catchAsync(async (req: Request, res: Response): Promise<voi
       role: true,
       status: true,
       avatar: true,
+      isEmailVerified: true,
       area: true,
       address: true,
       latitude: true,

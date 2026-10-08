@@ -8,24 +8,31 @@ import { comparePassword, generateToken } from '../../utils/auth';
 
 /**
  * Log in an existing user
- * Validates credentials and verifies user status is ACTIVE
+ * Validates credentials, verifies user status is ACTIVE, and verifies email is verified
  */
 export const login = catchAsync(async (req: Request, res: Response): Promise<void> => {
-  const { phone, password } = req.body;
+  const { phone, email, password } = req.body;
 
-  if (!phone || !password) {
-    throw new AppError(400, 'Phone and password are required');
+  if ((!phone && !email) || !password) {
+    throw new AppError(400, 'Phone or email, and password are required');
   }
 
-  const normalizedPhone = String(phone).trim();
-
-  // Find user by phone number
-  const user = await prisma.user.findUnique({
-    where: { phone: normalizedPhone },
-  });
+  // Find user by phone or email
+  let user = null;
+  if (phone) {
+    const normalizedPhone = String(phone).trim();
+    user = await prisma.user.findUnique({
+      where: { phone: normalizedPhone },
+    });
+  } else if (email) {
+    const normalizedEmail = String(email).trim().toLowerCase();
+    user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+  }
 
   if (!user) {
-    throw new AppError(401, 'Invalid phone number or password');
+    throw new AppError(401, phone ? 'Invalid phone number or password' : 'Invalid email or password');
   }
 
   // Check user active status
@@ -36,7 +43,12 @@ export const login = catchAsync(async (req: Request, res: Response): Promise<voi
   // Verify password
   const isPasswordMatch = await comparePassword(password, user.passwordHash);
   if (!isPasswordMatch) {
-    throw new AppError(401, 'Invalid phone number or password');
+    throw new AppError(401, phone ? 'Invalid phone number or password' : 'Invalid email or password');
+  }
+
+  // Check if email is verified
+  if (!user.isEmailVerified) {
+    throw new AppError(403, 'Please verify your email first before logging in.');
   }
 
   // Generate JWT token

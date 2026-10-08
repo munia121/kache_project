@@ -23,6 +23,7 @@ model User {
   role         Role       @default(USER)
   status       UserStatus @default(ACTIVE)
   avatar       String?    @db.VarChar(255)
+  isEmailVerified Boolean @default(false) @map("is_email_verified")
   
   // Hyperlocal Location Info
   area         String?    @db.VarChar(100)
