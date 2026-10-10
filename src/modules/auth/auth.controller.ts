@@ -5,6 +5,7 @@ export { verifyOtp } from './verifyOtp.controller';
 export { resendOtp } from './resendOtp.controller';
 export { forgotPassword } from './forgotPassword.controller';
 export { resetPassword } from './resetPassword.controller';
+export { refreshToken } from './refreshToken.controller';
 
 import { register } from './register.controller';
 import { login } from './login.controller';
@@ -13,6 +14,7 @@ import { verifyOtp } from './verifyOtp.controller';
 import { resendOtp } from './resendOtp.controller';
 import { forgotPassword } from './forgotPassword.controller';
 import { resetPassword } from './resetPassword.controller';
+import { refreshToken } from './refreshToken.controller';
 
 export const AuthController = {
   register,
@@ -22,6 +24,7 @@ export const AuthController = {
   resendOtp,
   forgotPassword,
   resetPassword,
+  refreshToken,
 };
 
 export default AuthController;

@@ -7,6 +7,7 @@ import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { hashPassword } from '../../utils/auth';
 import sendEmail from '../../utils/sendEmail';
+import { saveOtp, deleteOtp } from '../../utils/otp';
 
 /**
  * Register a new user
@@ -32,6 +33,7 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
   // ============================================================================
   // [TESTING MODE] - Commented out so you can test registration repeatedly with the same email
   // ============================================================================
+  
   /*
   // Check if phone already exists
   const existingUserByPhone = await prisma.user.findUnique({
@@ -53,9 +55,7 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
   */
 
   // [TESTING HELPER]: Delete previous record for this email or phone so re-registering succeeds without database unique constraint errors
-  await prisma.otp.deleteMany({
-    where: { email: normalizedEmail },
-  });
+  await deleteOtp(normalizedEmail);
   await prisma.user.deleteMany({
     where: {
       OR: [{ email: normalizedEmail }, { phone: normalizedPhone }],
@@ -97,22 +97,8 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
   // Generate secure 6-digit random OTP
   const otpCode = crypto.randomInt(100000, 1000000).toString();
 
-  // Expiration set to exactly 3 minutes from now
-  const expiresAt = new Date(Date.now() + 3 * 60 * 1000);
-
-  // Delete any existing OTPs for this email to maintain clean state
-  await prisma.otp.deleteMany({
-    where: { email: normalizedEmail },
-  });
-
-  // Save fresh OTP in database
-  await prisma.otp.create({
-    data: {
-      email: normalizedEmail,
-      code: otpCode,
-      expiresAt,
-    },
-  });
+  // Save fresh OTP in Redis with 3 minutes (180s) TTL
+  await saveOtp(normalizedEmail, otpCode, 180);
 
   // Send OTP email via nodemailer
   try {

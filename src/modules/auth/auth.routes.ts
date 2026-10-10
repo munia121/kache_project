@@ -6,6 +6,7 @@ import { verifyOtp } from './verifyOtp.controller';
 import { resendOtp } from './resendOtp.controller';
 import { forgotPassword } from './forgotPassword.controller';
 import { resetPassword } from './resetPassword.controller';
+import { refreshToken } from './refreshToken.controller';
 import { verifyToken } from '../../middlewares/auth';
 
 const router = Router();
@@ -17,6 +18,7 @@ router.post('/resend-otp', resendOtp);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/login', login);
+router.post('/refresh-token', refreshToken);
 router.get('/me', verifyToken, getMe);
 
 export const AuthRoutes = router;

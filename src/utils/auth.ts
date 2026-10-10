@@ -40,6 +40,38 @@ export const generateToken = (
 };
 
 /**
+ * Generate an Access Token
+ */
+export const generateAccessToken = (
+  payload: object,
+  expiresIn: string | number = config.jwt_expires_in || '7d'
+): string => {
+  return generateToken(payload, expiresIn);
+};
+
+/**
+ * Generate a Refresh Token
+ */
+export const generateRefreshToken = (
+  payload: object,
+  expiresIn: string | number = config.jwt_refresh_expires_in || '30d'
+): string => {
+  const secret = (process.env.JWT_REFRESH_SECRET || config.jwt_refresh_secret) as string;
+  const options: SignOptions = {
+    expiresIn: expiresIn as any,
+  };
+  return jwt.sign(payload, secret, options);
+};
+
+/**
+ * Verify a Refresh Token
+ */
+export const verifyRefreshToken = (token: string): any => {
+  const secret = (process.env.JWT_REFRESH_SECRET || config.jwt_refresh_secret) as string;
+  return jwt.verify(token, secret);
+};
+
+/**
  * Verify a JWT token
  * @param token JWT token string
  * @returns Decoded payload
@@ -53,5 +85,8 @@ export default {
   hashPassword,
   comparePassword,
   generateToken,
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
   verifyJwtToken,
 };

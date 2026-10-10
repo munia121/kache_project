@@ -2,6 +2,7 @@ import { Server } from 'http';
 import app from './app';
 import config from './config';
 import { prisma, pool } from './config/prismaClient';
+import { redis } from './config/redis';
 
 let server: Server;
 
@@ -23,11 +24,13 @@ const main = async () => {
           console.log('Server closed gracefully');
           await prisma.$disconnect();
           await pool.end();
+          await redis.quit();
           process.exit(1);
         });
       } else {
         await prisma.$disconnect();
         await pool.end();
+        await redis.quit();
         process.exit(1);
       }
     } catch (err) {

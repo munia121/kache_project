@@ -4,6 +4,7 @@ import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { hashPassword } from '../../utils/auth';
+import { getOtp, deleteOtp } from '../../utils/otp';
 
 /**
  * Reset password using OTP code
@@ -32,27 +33,16 @@ export const resetPassword = catchAsync(async (req: Request, res: Response): Pro
     throw new AppError(404, 'No account found with this email address');
   }
 
-  // Find latest OTP for this email
-  const otpRecord = await prisma.otp.findFirst({
-    where: { email: normalizedEmail },
-    orderBy: { createdAt: 'desc' },
-  });
+  // Get OTP from Redis
+  const savedOtp = await getOtp(normalizedEmail);
 
-  if (!otpRecord) {
-    throw new AppError(400, 'No OTP request found for this email. Please request an OTP first.');
+  if (!savedOtp) {
+    throw new AppError(400, 'OTP code has expired or not found. Please request an OTP first.');
   }
 
   // Verify OTP code
-  if (otpRecord.code !== normalizedCode) {
+  if (savedOtp !== normalizedCode) {
     throw new AppError(400, 'Invalid OTP code');
-  }
-
-  // Verify expiration
-  if (otpRecord.expiresAt <= new Date()) {
-    await prisma.otp.deleteMany({
-      where: { email: normalizedEmail },
-    });
-    throw new AppError(400, 'OTP code has expired. Please request a new one.');
   }
 
   // Hash new password
@@ -66,10 +56,8 @@ export const resetPassword = catchAsync(async (req: Request, res: Response): Pro
     },
   });
 
-  // Delete used OTP
-  await prisma.otp.deleteMany({
-    where: { email: normalizedEmail },
-  });
+  // Delete used OTP from Redis
+  await deleteOtp(normalizedEmail);
 
   sendResponse(res, {
     statusCode: 200,

@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
+import config from '../../config';
 import prisma from '../../config/prismaClient';
 import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
-import { generateToken } from '../../utils/auth';
+import { generateAccessToken, generateRefreshToken } from '../../utils/auth';
+import { getOtp, deleteOtp } from '../../utils/otp';
 
 /**
  * Verify OTP code and automatically log in the user
@@ -28,28 +30,16 @@ export const verifyOtp = catchAsync(async (req: Request, res: Response): Promise
     throw new AppError(404, 'User with this email not found');
   }
 
-  // Find latest OTP for this email
-  const otpRecord = await prisma.otp.findFirst({
-    where: { email: normalizedEmail },
-    orderBy: { createdAt: 'desc' },
-  });
+  // Get OTP from Redis
+  const savedOtp = await getOtp(normalizedEmail);
 
-  if (!otpRecord) {
-    throw new AppError(400, 'No OTP request found for this email. Please request an OTP first.');
+  if (!savedOtp) {
+    throw new AppError(400, 'OTP code has expired or not found. Please request a new one.');
   }
 
   // Verify OTP code
-  if (otpRecord.code !== normalizedCode) {
+  if (savedOtp !== normalizedCode) {
     throw new AppError(400, 'Invalid OTP code');
-  }
-
-  // Verify expiration (expiresAt must be > new Date())
-  if (otpRecord.expiresAt <= new Date()) {
-    // Delete expired OTP
-    await prisma.otp.deleteMany({
-      where: { email: normalizedEmail },
-    });
-    throw new AppError(400, 'OTP code has expired. Please request a new one.');
   }
 
   // Update user isEmailVerified to true
@@ -74,16 +64,25 @@ export const verifyOtp = catchAsync(async (req: Request, res: Response): Promise
     },
   });
 
-  // Delete used OTP
-  await prisma.otp.deleteMany({
-    where: { email: normalizedEmail },
-  });
+  // Delete used OTP from Redis
+  await deleteOtp(normalizedEmail);
 
-  // Generate JWT token for auto-login
-  const token = generateToken({
+  // Generate JWT access & refresh tokens for auto-login
+  const tokenPayload = {
     id: updatedUser.id,
     phone: updatedUser.phone,
     role: updatedUser.role,
+    email: updatedUser.email,
+  };
+
+  const accessToken = generateAccessToken(tokenPayload);
+  const refreshToken = generateRefreshToken(tokenPayload);
+
+  // Set refreshToken in HTTP-only cookie
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: config.env === 'production',
+    sameSite: 'lax',
   });
 
   sendResponse(res, {
@@ -92,7 +91,9 @@ export const verifyOtp = catchAsync(async (req: Request, res: Response): Promise
     message: 'OTP verified successfully. Logged in automatically.',
     data: {
       user: updatedUser,
-      token,
+      accessToken,
+      refreshToken,
+      token: accessToken,
     },
   });
 });

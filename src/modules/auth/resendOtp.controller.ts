@@ -5,6 +5,7 @@ import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import sendEmail from '../../utils/sendEmail';
+import { saveOtp } from '../../utils/otp';
 
 /**
  * Resend a new OTP to user's email
@@ -41,22 +42,8 @@ export const resendOtp = catchAsync(async (req: Request, res: Response): Promise
   // Generate new secure 6-digit random OTP
   const otpCode = crypto.randomInt(100000, 1000000).toString();
 
-  // Expiration set to 3 minutes from now
-  const expiresAt = new Date(Date.now() + 3 * 60 * 1000);
-
-  // Delete any existing OTPs for this email to maintain clean state
-  await prisma.otp.deleteMany({
-    where: { email: normalizedEmail },
-  });
-
-  // Save fresh OTP in database
-  await prisma.otp.create({
-    data: {
-      email: normalizedEmail,
-      code: otpCode,
-      expiresAt,
-    },
-  });
+  // Save fresh OTP in Redis with 3 minutes (180s) TTL
+  await saveOtp(normalizedEmail, otpCode, 180);
 
   // Send new OTP email via nodemailer
   try {

@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { UserStatus } from '@prisma/client';
+import config from '../../config';
 import prisma from '../../config/prismaClient';
 import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
-import { comparePassword, generateToken } from '../../utils/auth';
+import { comparePassword, generateAccessToken, generateRefreshToken } from '../../utils/auth';
 
 /**
  * Log in an existing user
@@ -51,11 +52,22 @@ export const login = catchAsync(async (req: Request, res: Response): Promise<voi
     throw new AppError(403, 'Please verify your email first before logging in.');
   }
 
-  // Generate JWT token
-  const token = generateToken({
+  // Generate JWT access & refresh tokens
+  const tokenPayload = {
     id: user.id,
     phone: user.phone,
     role: user.role,
+    email: user.email,
+  };
+
+  const accessToken = generateAccessToken(tokenPayload);
+  const refreshToken = generateRefreshToken(tokenPayload);
+
+  // Set refreshToken in HTTP-only cookie
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: config.env === 'production',
+    sameSite: 'lax',
   });
 
   // Exclude passwordHash from response
@@ -67,7 +79,8 @@ export const login = catchAsync(async (req: Request, res: Response): Promise<voi
     message: 'User logged in successfully',
     data: {
       user: userWithoutPassword,
-      token,
+      accessToken,
+      refreshToken
     },
   });
 });

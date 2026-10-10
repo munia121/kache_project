@@ -5,6 +5,7 @@ import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import sendEmail from '../../utils/sendEmail';
+import { saveOtp } from '../../utils/otp';
 
 /**
  * Initiate Forgot Password by sending OTP to user's email
@@ -31,21 +32,8 @@ export const forgotPassword = catchAsync(async (req: Request, res: Response): Pr
   // Generate 6-digit random OTP
   const otpCode = crypto.randomInt(100000, 1000000).toString();
 
-  // Expiration set to 5 minutes from now
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-  // Clean previous OTPs and create new one
-  await prisma.otp.deleteMany({
-    where: { email: normalizedEmail },
-  });
-
-  await prisma.otp.create({
-    data: {
-      email: normalizedEmail,
-      code: otpCode,
-      expiresAt,
-    },
-  });
+  // Save OTP in Redis with 5 minutes (300s) TTL
+  await saveOtp(normalizedEmail, otpCode, 300);
 
   // Send OTP email via nodemailer
   try {
