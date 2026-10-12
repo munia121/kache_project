@@ -39,10 +39,10 @@ export const forgotPassword = catchAsync(async (req: Request, res: Response): Pr
   try {
     await sendEmail({
       to: normalizedEmail,
-      subject: 'কাছে (Kache) - পাসওয়ার্ড রিসেট ওটিপি কোড',
+      subject: 'Kache - Password Reset OTP Code',
       otp: otpCode,
-      title: 'পাসওয়ার্ড রিসেট ওটিপি কোড',
-      purpose: 'আপনার অ্যাকাউন্টের পাসওয়ার্ড রিসেট করার জন্য অনুরোধ করা হয়েছে। পাসওয়ার্ড পরিবর্তন করতে নিচের ওটিপি (OTP) কোডটি ব্যবহার করুন:',
+      title: 'Password Reset OTP Code',
+      purpose: 'A request was received to reset your account password. Please use the OTP code below to reset your password:',
     });
   } catch (error) {
     console.error('Failed to send forgot password email:', error);

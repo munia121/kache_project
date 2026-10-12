@@ -1,5 +1,5 @@
 export interface IAuthUser {
-  id: number;
+  id: string;
   phone: string;
   role: string;
   email?: string | null;

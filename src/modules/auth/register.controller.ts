@@ -104,10 +104,10 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
   try {
     await sendEmail({
       to: normalizedEmail,
-      subject: 'কাছে (Kache) - ইমেইল ভেরিফিকেশন ওটিপি কোড',
+      subject: 'Kache - Email Verification OTP Code',
       otp: otpCode,
-      title: 'ইমেইল যাচাইকরণ ওটিপি কোড',
-      purpose: 'কাছে (Kache) লোকাল মার্কেটপ্লেসে স্বাগতম! আপনার অ্যাকাউন্ট নিশ্চিত করতে এবং রেজিস্ট্রেশন সম্পন্ন করতে নিচের ওটিপি (OTP) কোডটি ব্যবহার করুন:',
+      title: 'Email Verification OTP Code',
+      purpose: 'Welcome to Kache Marketplace! Please use the OTP code below to verify your account and complete your registration:',
     });
   } catch (error) {
     console.error('Failed to send verification email:', error);

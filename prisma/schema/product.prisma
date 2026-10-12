@@ -1,8 +1,9 @@
 // Product Module Schema (Product & ProductImage)
 
 model Product {
-  id            Int            @id @default(autoincrement())
-  categoryId    Int?           @map("category_id")
+  id            String         @id @default(uuid())
+  categoryId    String?        @map("category_id")
+  userId        String         @map("user_id")
   name          String         @db.VarChar(255)
   slug          String         @unique @db.VarChar(255)
   description   String?        @db.Text
@@ -14,16 +15,18 @@ model Product {
 
   // Relations
   category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user          User?          @relation(fields: [userId], references: [id])
   images        ProductImage[]
   orderItems    OrderItem[]
+  
 
   @@index([categoryId], map: "idx_products_category_id")
   @@map("products")
 }
 
 model ProductImage {
-  id           Int      @id @default(autoincrement())
-  productId    Int      @map("product_id")
+  id           String   @id @default(uuid())
+  productId    String   @map("product_id")
   imageUrl     String   @map("image_url") @db.Text
   isPrimary    Boolean  @default(false) @map("is_primary")
   displayOrder Int      @default(0) @map("display_order")

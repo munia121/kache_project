@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { UserStatus } from '@prisma/client';
+import { Role, UserStatus } from '@prisma/client';
 import AppError from '../errors/AppError';
 import catchAsync from '../utils/catchAsync';
 import { verifyJwtToken } from '../utils/auth';
@@ -58,4 +58,22 @@ export const verifyToken = catchAsync(
   }
 );
 
+/**
+ * Middleware to restrict access based on user role
+ */
+export const authorize = (...roles: (Role | string)[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      throw new AppError(401, 'Unauthorized access: user identity not verified');
+    }
+
+    if (roles.length > 0 && !roles.includes(req.user.role as Role)) {
+      throw new AppError(403, 'Forbidden: You do not have permission to perform this action');
+    }
+
+    next();
+  };
+};
+
 export default verifyToken;
+

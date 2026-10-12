@@ -20,8 +20,8 @@ enum PaymentStatus {
 }
 
 model Order {
-  id              Int           @id @default(autoincrement())
-  userId          Int           @map("user_id")
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
   status          OrderStatus   @default(pending)
   totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
   shippingAddress String        @map("shipping_address") @db.Text
@@ -38,9 +38,9 @@ model Order {
 }
 
 model OrderItem {
-  id        Int      @id @default(autoincrement())
-  orderId   Int      @map("order_id")
-  productId Int      @map("product_id")
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  productId String   @map("product_id")
   quantity  Int
   unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()

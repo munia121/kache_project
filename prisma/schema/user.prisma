@@ -15,7 +15,8 @@ enum UserStatus {
 }
 
 model User {
-  id           Int        @id @default(autoincrement())
+  id           String     @id @default(uuid())
+  
   fullName     String     @map("full_name") @db.VarChar(150)
   phone        String     @unique @db.VarChar(20)
   email        String?    @unique @db.VarChar(255)
@@ -35,7 +36,7 @@ model User {
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   // Relations (pore product add korar shomoy link hobe)
-  // products  Product[]
+   products    Product[]
 
   @@map("users")
 }

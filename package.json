@@ -10,7 +10,12 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "prisma:seed": "prisma db seed",
+    "seed": "prisma db seed",
     "postinstall": "prisma skills sync || exit 0"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   },
   "keywords": [],
   "author": "",
@@ -39,6 +44,7 @@
     "@types/pg": "^8.23.1",
     "nodemon": "^3.1.14",
     "prisma": "^7.10.0",
+    "ts-node": "^10.9.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }

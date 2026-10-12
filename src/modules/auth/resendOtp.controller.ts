@@ -49,10 +49,10 @@ export const resendOtp = catchAsync(async (req: Request, res: Response): Promise
   try {
     await sendEmail({
       to: normalizedEmail,
-      subject: 'কাছে (Kache) - নতুন ওটিপি কোড (Resend OTP)',
+      subject: 'Kache - Resend OTP Code',
       otp: otpCode,
-      title: 'নতুন ওটিপি কোড (Resend OTP)',
-      purpose: 'আপনার অনুরোধের প্রেক্ষিতে একটি নতুন ওটিপি কোড পাঠানো হয়েছে। অ্যাকাউন্ট নিশ্চিত করতে নিচের কোডটি ব্যবহার করুন:',
+      title: 'Resend OTP Code',
+      purpose: 'A new OTP code has been generated based on your request. Please use the code below to verify your account:',
     });
   } catch (error) {
     console.error('Failed to send resend verification email:', error);

@@ -23,16 +23,16 @@ export interface ISendEmailOptions {
  */
 export const generateOtpEmailTemplate = (
   otp: string,
-  title: string = 'ইমেইল যাচাইকরণ ওটিপি কোড',
-  purpose: string = 'কাছে (Kache) লোকাল মার্কেটপ্লেসে স্বাগতম! আপনার অ্যাকাউন্ট নিশ্চিত করতে নিচের ওটিপি (OTP) কোডটি ব্যবহার করুন:'
+  title: string = 'Email Verification OTP Code',
+  purpose: string = 'Welcome to Kache Marketplace! Please use the OTP code below to verify your account:'
 ): string => {
   return `
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>কাছে (Kache) - ওটিপি ভেরিফিকেশন</title>
+  <title>Kache - OTP Verification</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; color: #333333;">
   <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="min-width: 100%; background-color: #f4f6f9; padding: 40px 10px;">
@@ -45,10 +45,10 @@ export const generateOtpEmailTemplate = (
           <tr>
             <td align="center" style="background: linear-gradient(135deg, #0f766e 0%, #047857 100%); padding: 36px 20px;">
               <h1 style="margin: 0; color: #ffffff; font-size: 30px; font-weight: 700; letter-spacing: 0.5px;">
-                কাছে <span style="font-size: 22px; font-weight: 400; opacity: 0.9;">(Kache)</span>
+                Kache
               </h1>
               <p style="margin: 6px 0 0; color: #ccfbf1; font-size: 14px; font-weight: 400; letter-spacing: 0.3px;">
-                আপনার বিশ্বস্ত লোকাল মার্কেটপ্লেস
+                Your Trusted Local Marketplace
               </p>
             </td>
           </tr>
@@ -69,18 +69,18 @@ export const generateOtpEmailTemplate = (
                   ${otp}
                 </span>
                 <p style="margin: 10px 0 0; font-size: 13px; font-weight: 600; color: #dc2626;">
-                  ⏳ এই কোডটির মেয়াদ মাত্র ৩ মিনিট (Valid for 3 minutes only)
+                  ⏳ Valid for 3 minutes only
                 </p>
               </div>
 
               <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px;">
                 <p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">
-                  🔒 <strong>নিরাপত্তা সতর্কতা:</strong> এই ওটিপি কোডটি অত্যন্ত সংবেদনশীল। কারও সাথে (এমনকি কাছে সাপোর্ট টিমের সাথেও) এই কোডটি শেয়ার করবেন না।
+                  🔒 <strong>Security Warning:</strong> This OTP is strictly confidential. Do not share it with anyone, including Kache support staff.
                 </p>
               </div>
 
               <p style="margin: 0; color: #6b7280; font-size: 13px; line-height: 1.5; text-align: center;">
-                আপনি যদি এই ওটিপির জন্য অনুরোধ না করে থাকেন, তবে অনুগ্রহ করে এই বার্তাটি উপেক্ষা করুন।
+                If you did not request this OTP, please ignore this email.
               </p>
             </td>
           </tr>
@@ -89,7 +89,7 @@ export const generateOtpEmailTemplate = (
           <tr>
             <td style="background-color: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                © ${new Date().getFullYear()} কাছে (Kache) লোকাল মার্কেটপ্লেস। সর্বস্বত্ব সংরক্ষিত।
+                © ${new Date().getFullYear()} Kache Marketplace. All rights reserved.
               </p>
             </td>
           </tr>
@@ -154,15 +154,15 @@ export const sendEmail = async (
   if (typeof optionsOrTo === 'string') {
     to = optionsOrTo.trim().toLowerCase();
     rawOtp = otpCode;
-    subject = 'কাছে (Kache) - ইমেইল ভেরিফিকেশন ওটিপি কোড';
+    subject = 'Kache - Email Verification OTP Code';
     html = rawOtp ? generateOtpEmailTemplate(rawOtp) : '';
     text = rawOtp
-      ? `আপনার কাছে (Kache) ওটিপি কোড হলো: ${rawOtp}। এই কোডের মেয়াদ ৩ মিনিট।`
+      ? `Your Kache OTP verification code is: ${rawOtp}. Valid for 3 minutes.`
       : '';
   } else {
     to = optionsOrTo.to.trim().toLowerCase();
     rawOtp = optionsOrTo.otp;
-    subject = optionsOrTo.subject || 'কাছে (Kache) - ইমেইল ভেরিফিকেশন ওটিপি কোড';
+    subject = optionsOrTo.subject || 'Kache - Email Verification OTP Code';
 
     if (rawOtp) {
       html =
@@ -170,7 +170,7 @@ export const sendEmail = async (
         generateOtpEmailTemplate(rawOtp, optionsOrTo.title, optionsOrTo.purpose);
       text =
         optionsOrTo.text ||
-        `আপনার কাছে (Kache) ওটিপি কোড হলো: ${rawOtp}। এই কোডের মেয়াদ ৩ মিনিট।`;
+        `Your Kache OTP verification code is: ${rawOtp}. Valid for 3 minutes.`;
     } else {
       html = optionsOrTo.html || '';
       text = optionsOrTo.text || '';
@@ -180,7 +180,7 @@ export const sendEmail = async (
   const from =
     process.env.SMTP_FROM ||
     config.smtp_from ||
-    (process.env.SMTP_USER ? `"কাছে (Kache)" <${process.env.SMTP_USER}>` : '"কাছে (Kache)" <no-reply@kache.com>');
+    (process.env.SMTP_USER ? `"Kache" <${process.env.SMTP_USER}>` : '"Kache" <no-reply@kache.com>');
 
   const user = (process.env.SMTP_USER || config.smtp_user || '').trim();
   const pass = (process.env.SMTP_PASS || config.smtp_pass || '').trim();
