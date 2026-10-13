@@ -7,25 +7,8 @@ import CategoryService from './category.service';
 /**
  * Standard UUID v4/v1/v3/v5 format validation regex
  */
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-/**
- * Helper to validate UUID string parameter
- */
-export const validateUUID = (
-  id: string | string[] | undefined,
-  fieldName: string = 'id'
-): string => {
-  const value = Array.isArray(id) ? id[0] : id;
-  if (!value || typeof value !== 'string' || !UUID_REGEX.test(value.trim())) {
-    throw new AppError(
-      400,
-      `Invalid ${fieldName} parameter format. Must be a valid UUID string.`
-    );
-  }
-  return value.trim();
-};
+import { validateUUID, UUID_REGEX } from '../../utils/validateUUID';
+export { validateUUID, UUID_REGEX };
 
 /**
  * Get all categories with optional isActive filter

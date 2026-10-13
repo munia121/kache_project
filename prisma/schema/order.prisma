@@ -47,7 +47,7 @@ model OrderItem {
 
   // Relations
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  // product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@index([orderId], map: "idx_order_items_order_id")
   @@index([productId], map: "idx_order_items_product_id")
