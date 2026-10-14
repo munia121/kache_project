@@ -1,5 +1,6 @@
 import { ErrorRequestHandler, NextFunction, Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
+import multer from 'multer';
 import config from '../config';
 import AppError from '../errors/AppError';
 
@@ -99,16 +100,24 @@ const globalErrorHandler: ErrorRequestHandler = (
       },
     ];
   }
-  // 5. Handle Zod validation errors (if Zod is added later)
-  else if (err?.name === 'ZodError' && Array.isArray(err?.issues)) {
+  // 6. Handle Multer Errors (File limits, file count, etc.)
+  else if (err instanceof multer.MulterError) {
     statusCode = 400;
-    message = 'Validation Error';
-    errorMessages = err.issues.map((issue: any) => ({
-      path: issue?.path?.[issue.path.length - 1] || '',
-      message: issue?.message || 'Invalid value',
-    }));
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      message = 'File size exceeds limit: maximum allowed size is 5MB per image';
+    } else if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
+      message = 'Maximum 5 image files can be uploaded per request';
+    } else {
+      message = `Upload error: ${err.message}`;
+    }
+    errorMessages = [
+      {
+        path: err.field || 'images',
+        message,
+      },
+    ];
   }
-  // 6. Generic JavaScript Error
+  // 7. Generic JavaScript Error
   else if (err instanceof Error) {
     message = err.message;
     errorMessages = [

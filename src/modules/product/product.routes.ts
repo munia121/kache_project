@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ProductController } from './product.controller';
 import { verifyToken } from '../../middlewares/auth';
+import { uploadProductImages } from '../../middlewares/upload';
 
 const router = Router();
 
@@ -47,17 +48,27 @@ router.get('/:slug', ProductController.getProductBySlug);
 
 /**
  * @route   POST /api/products
- * @desc    Create a new product listing
+ * @desc    Create a new product listing (supports multipart/form-data images)
  * @access  Authenticated (Any logged in user)
  */
-router.post('/', verifyToken, ProductController.createProduct);
+router.post(
+  '/',
+  verifyToken,
+  uploadProductImages,
+  ProductController.createProduct
+);
 
 /**
  * @route   PATCH /api/products/:id
- * @desc    Update an existing product listing
+ * @desc    Update an existing product listing (supports multipart/form-data images)
  * @access  Authenticated (Owner or ADMIN/SUPER_ADMIN)
  */
-router.patch('/:id', verifyToken, ProductController.updateProduct);
+router.patch(
+  '/:id',
+  verifyToken,
+  uploadProductImages,
+  ProductController.updateProduct
+);
 
 /**
  * @route   DELETE /api/products/:id

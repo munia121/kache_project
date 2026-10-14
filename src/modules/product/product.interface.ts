@@ -12,6 +12,7 @@ export interface ICreateProductPayload {
   images?: string[];
   location?: string | null;
   categoryId?: string | null;
+  replaceImages?: boolean;
 }
 
 export interface IUpdateProductPayload {
@@ -24,6 +25,7 @@ export interface IUpdateProductPayload {
   images?: string[];
   location?: string | null;
   categoryId?: string | null;
+  replaceImages?: boolean;
 }
 
 export interface IProductFilterOptions {

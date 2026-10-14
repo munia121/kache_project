@@ -5,6 +5,11 @@ import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import validateUUID from '../../utils/validateUUID';
 import ProductService from './product.service';
+import { uploadToCloudinary } from '../../config/cloudinary';
+import {
+  ICreateProductPayload,
+  IUpdateProductPayload,
+} from './product.interface';
 
 /**
  * Get all product listings with filtering, search, and pagination
@@ -71,13 +76,148 @@ export const getProductById = catchAsync(
  * Create a new product listing
  * POST /api/products
  */
+/**
+ * Helper function to parse multipart/form-data text fields into structured types.
+ * Supports individual fields, nested JSON data string, and image array strings.
+ */
+export const parseProductBody = (
+  rawBody: Record<string, unknown>
+): Record<string, unknown> => {
+  const body: Record<string, unknown> = { ...rawBody };
+
+  // 1. If payload was passed as a JSON string under 'data' key
+  if (typeof body.data === 'string' && body.data.trim() !== '') {
+    try {
+      const parsedData = JSON.parse(body.data);
+      if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+        Object.assign(body, parsedData);
+      }
+    } catch {
+      throw new AppError(400, 'Invalid JSON format in "data" field');
+    }
+    delete body.data;
+  }
+
+  // 2. Parse price to number if provided as string
+  if (body.price !== undefined && body.price !== null && body.price !== '') {
+    const numPrice = Number(body.price);
+    if (isNaN(numPrice)) {
+      throw new AppError(400, 'Valid numeric price is required');
+    }
+    body.price = numPrice;
+  }
+
+  // 3. Parse isNegotiable boolean
+  if (body.isNegotiable !== undefined) {
+    if (typeof body.isNegotiable === 'string') {
+      const normalized = body.isNegotiable.trim().toLowerCase();
+      body.isNegotiable = normalized === 'true' || normalized === '1';
+    } else {
+      body.isNegotiable = Boolean(body.isNegotiable);
+    }
+  }
+
+  // 4. Parse replaceImages boolean flag
+  if (body.replaceImages !== undefined) {
+    if (typeof body.replaceImages === 'string') {
+      const normalized = body.replaceImages.trim().toLowerCase();
+      body.replaceImages = normalized === 'true' || normalized === '1';
+    } else {
+      body.replaceImages = Boolean(body.replaceImages);
+    }
+  }
+
+  // 5. Parse condition enum
+  if (typeof body.condition === 'string') {
+    body.condition = body.condition.trim().toUpperCase();
+  }
+
+  // 6. Parse status enum
+  if (typeof body.status === 'string') {
+    body.status = body.status.trim().toUpperCase();
+  }
+
+  // 7. Parse categoryId
+  if (typeof body.categoryId === 'string') {
+    const trimmedCategory = body.categoryId.trim();
+    body.categoryId =
+      trimmedCategory === '' ||
+      trimmedCategory === 'null' ||
+      trimmedCategory === 'undefined'
+        ? null
+        : trimmedCategory;
+  }
+
+  // 8. Parse location
+  if (typeof body.location === 'string') {
+    const trimmedLocation = body.location.trim();
+    body.location =
+      trimmedLocation === '' ||
+      trimmedLocation === 'null' ||
+      trimmedLocation === 'undefined'
+        ? null
+        : trimmedLocation;
+  }
+
+  // 9. Parse images if passed in body (as JSON array, comma-separated, or single string)
+  if (typeof body.images === 'string') {
+    const trimmedImages = body.images.trim();
+    if (trimmedImages === '' || trimmedImages === 'null' || trimmedImages === '[]') {
+      body.images = [];
+    } else {
+      try {
+        const parsedImages = JSON.parse(trimmedImages);
+        body.images = Array.isArray(parsedImages)
+          ? parsedImages.map(String).map((s) => s.trim()).filter(Boolean)
+          : [String(parsedImages).trim()];
+      } catch {
+        if (trimmedImages.includes(',')) {
+          body.images = trimmedImages
+            .split(',')
+            .map((url) => url.trim())
+            .filter(Boolean);
+        } else {
+          body.images = [trimmedImages];
+        }
+      }
+    }
+  } else if (Array.isArray(body.images)) {
+    body.images = body.images.map(String).map((s) => s.trim()).filter(Boolean);
+  }
+
+  return body;
+};
+
+/**
+ * Safely extracts uploaded files from Express Request
+ */
+export const getUploadedFiles = (req: Request): Express.Multer.File[] => {
+  if (Array.isArray(req.files)) {
+    return req.files as Express.Multer.File[];
+  }
+  if (req.files && typeof req.files === 'object') {
+    const values = Object.values(req.files);
+    return values.flat() as Express.Multer.File[];
+  }
+  if (req.file) {
+    return [req.file];
+  }
+  return [];
+};
+
+/**
+ * Create a new product listing
+ * POST /api/products
+ */
 export const createProduct = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
     if (!req.user) {
       throw new AppError(401, 'Unauthorized access: user identity not verified');
     }
 
-    const { title, description, price } = req.body;
+    // Parse form-data / JSON body fields
+    const parsedBody = parseProductBody(req.body);
+    const { title, description, price } = parsedBody;
 
     if (!title || typeof title !== 'string' || title.trim() === '') {
       throw new AppError(400, 'Title is required and must be a non-empty string');
@@ -95,7 +235,32 @@ export const createProduct = catchAsync(
       throw new AppError(400, 'Price must be a non-negative number');
     }
 
-    const product = await ProductService.createProduct(req.user.id, req.body);
+    // Upload any attached image files to Cloudinary
+    const files = getUploadedFiles(req);
+    let uploadedUrls: string[] = [];
+
+    if (files.length > 0) {
+      uploadedUrls = await Promise.all(
+        files.map((file) => uploadToCloudinary(file.buffer, 'kache/products'))
+      );
+    }
+
+    // Merge any existing image URLs specified in request body with newly uploaded Cloudinary URLs
+    const initialImages = Array.isArray(parsedBody.images)
+      ? (parsedBody.images as string[])
+      : [];
+    const finalImages = [...initialImages, ...uploadedUrls];
+
+    const createPayload: ICreateProductPayload = {
+      ...(parsedBody as unknown as ICreateProductPayload),
+      title: title.trim(),
+      description: description.trim(),
+      price: Number(price),
+      images: finalImages,
+    };
+    delete createPayload.replaceImages;
+
+    const product = await ProductService.createProduct(req.user.id, createPayload);
 
     sendResponse(res, {
       statusCode: 201,
@@ -153,7 +318,66 @@ export const updateProduct = catchAsync(
       );
     }
 
-    const updatedProduct = await ProductService.updateProduct(id, req.body);
+    // Parse form-data / JSON body fields
+    const parsedBody = parseProductBody(req.body);
+
+    if (parsedBody.title !== undefined) {
+      if (typeof parsedBody.title !== 'string' || parsedBody.title.trim() === '') {
+        throw new AppError(400, 'Title must be a non-empty string');
+      }
+    }
+
+    if (parsedBody.description !== undefined) {
+      if (
+        typeof parsedBody.description !== 'string' ||
+        parsedBody.description.trim() === ''
+      ) {
+        throw new AppError(400, 'Description must be a non-empty string');
+      }
+    }
+
+    if (parsedBody.price !== undefined) {
+      if (isNaN(Number(parsedBody.price)) || Number(parsedBody.price) < 0) {
+        throw new AppError(400, 'Price must be a non-negative number');
+      }
+    }
+
+    // Upload any newly uploaded files to Cloudinary
+    const files = getUploadedFiles(req);
+    let newUploadedUrls: string[] = [];
+
+    if (files.length > 0) {
+      newUploadedUrls = await Promise.all(
+        files.map((file) => uploadToCloudinary(file.buffer, 'kache/products'))
+      );
+    }
+
+    const replaceImages = parsedBody.replaceImages === true;
+    let finalImages: string[] | undefined = undefined;
+
+    if (replaceImages) {
+      // Replace mode: newly uploaded files + body images completely replace previous images
+      const bodyImages = Array.isArray(parsedBody.images)
+        ? (parsedBody.images as string[])
+        : [];
+      finalImages = [...bodyImages, ...newUploadedUrls];
+    } else {
+      // Append mode: if new files or body images are provided, combine them with existing images
+      if (newUploadedUrls.length > 0 || parsedBody.images !== undefined) {
+        const baseImages = Array.isArray(parsedBody.images)
+          ? (parsedBody.images as string[])
+          : (existingProduct.images || []);
+        finalImages = [...baseImages, ...newUploadedUrls];
+      }
+    }
+
+    const updatePayload: IUpdateProductPayload = {
+      ...(parsedBody as unknown as IUpdateProductPayload),
+      ...(finalImages !== undefined && { images: finalImages }),
+    };
+    delete updatePayload.replaceImages;
+
+    const updatedProduct = await ProductService.updateProduct(id, updatePayload);
 
     sendResponse(res, {
       statusCode: 200,
