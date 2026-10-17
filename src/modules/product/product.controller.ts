@@ -17,7 +17,7 @@ import {
  */
 export const getAllProducts = catchAsync(
   async (req: Request, res: Response): Promise<void> => {
-    const result = await ProductService.getAllProducts(req.query);
+    const result = await ProductService.getAllProducts(req.query, req.user);
 
     sendResponse(res, {
       statusCode: 200,

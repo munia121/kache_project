@@ -15,6 +15,7 @@ export interface IApiResponse<T> {
 
 export const sendResponse = <T>(res: Response, responseData: IApiResponse<T>): void => {
   res.status(responseData.statusCode).json({
+    statusCode: responseData.statusCode,
     success: responseData.success,
     message: responseData.message ?? 'Success',
     meta: responseData.meta ?? undefined,

@@ -75,5 +75,47 @@ export const authorize = (...roles: (Role | string)[]) => {
   };
 };
 
+/**
+ * Middleware to optionally verify JWT token if provided
+ * Sets authenticated user payload on req.user if a valid token is provided,
+ * but allows guest users to continue without error.
+ */
+export const optionalAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded: any = verifyJwtToken(token);
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+    });
+
+    if (user && user.status === UserStatus.ACTIVE) {
+      req.user = {
+        id: user.id,
+        phone: user.phone,
+        role: user.role,
+        email: user.email,
+      };
+    }
+  } catch {
+    // If token is invalid or expired, continue as guest without populating req.user
+  }
+
+  next();
+};
+
 export default verifyToken;
 

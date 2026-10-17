@@ -1,11 +1,13 @@
-import { Product, ProductCondition, ProductStatus, Prisma } from '@prisma/client';
+import { Product, ProductCondition, ProductStatus, Prisma, Role } from '@prisma/client';
 import prisma from '../../config/prismaClient';
 import AppError from '../../errors/AppError';
+import { UUID_REGEX } from '../../utils/validateUUID';
 import {
   ICreateProductPayload,
   IUpdateProductPayload,
   IProductFilterOptions,
   IProductQueryResult,
+  IProductWithRelations,
 } from './product.interface';
 
 /**
@@ -102,79 +104,151 @@ export const createProduct = async (
 };
 
 /**
- * Get all products with search, filtering, and pagination
+ * Get all products with advanced search, multi-field filtering, dynamic sorting, and pagination
  */
 export const getAllProducts = async (
-  filters: IProductFilterOptions = {}
-): Promise<IProductQueryResult> => {
-  const page = Math.max(1, Number(filters.page) || 1);
-  const limit = Math.max(1, Math.min(100, Number(filters.limit) || 10));
+  filters: IProductFilterOptions = {},
+  currentUser?: { id?: string; role?: Role | string }
+): Promise<IProductQueryResult<IProductWithRelations>> => {
+  // 1. Standardized Pagination (default: page 1, limit 10, max cap: 50)
+  const page = Math.max(1, parseInt(String(filters.page || 1), 10) || 1);
+  const parsedLimit = parseInt(String(filters.limit || 10), 10) || 10;
+  const limit = Math.max(1, Math.min(50, parsedLimit));
   const skip = (page - 1) * limit;
 
-  const whereConditions: Prisma.ProductWhereInput[] = [];
+  // 2. Dynamic AND conditions array
+  const andConditions: Prisma.ProductWhereInput[] = [];
 
-  // Search by title or description
-  const searchTerm = filters.searchTerm || filters.search;
-  if (searchTerm && searchTerm.trim() !== '') {
-    const term = searchTerm.trim();
-    whereConditions.push({
+  // Search by title or description (case-insensitive)
+  const searchTerm = (filters.searchTerm || filters.search)?.toString().trim();
+  if (searchTerm) {
+    andConditions.push({
       OR: [
-        { title: { contains: term, mode: 'insensitive' } },
-        { description: { contains: term, mode: 'insensitive' } },
+        { title: { contains: searchTerm, mode: 'insensitive' } },
+        { description: { contains: searchTerm, mode: 'insensitive' } },
       ],
     });
   }
 
-  // Filter by category
-  if (filters.categoryId && filters.categoryId.trim() !== '') {
-    whereConditions.push({ categoryId: filters.categoryId.trim() });
-  }
-
-  // Filter by condition
-  if (filters.condition) {
-    whereConditions.push({ condition: filters.condition });
-  }
-
-  // Filter by status (defaults to AVAILABLE for public browsing if not provided)
-  if (filters.status) {
-    if (filters.status !== 'ALL') {
-      whereConditions.push({ status: filters.status });
+  // Price Boundary Filter (minPrice & maxPrice decimal comparison)
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+    const priceFilter: Prisma.DecimalFilter = {};
+    if (
+      filters.minPrice !== undefined &&
+      filters.minPrice !== '' &&
+      !isNaN(Number(filters.minPrice))
+    ) {
+      priceFilter.gte = new Prisma.Decimal(Number(filters.minPrice));
     }
-  } else {
-    whereConditions.push({ status: ProductStatus.AVAILABLE });
+    if (
+      filters.maxPrice !== undefined &&
+      filters.maxPrice !== '' &&
+      !isNaN(Number(filters.maxPrice))
+    ) {
+      priceFilter.lte = new Prisma.Decimal(Number(filters.maxPrice));
+    }
+    if (priceFilter.gte !== undefined || priceFilter.lte !== undefined) {
+      andConditions.push({ price: priceFilter });
+    }
   }
 
-  // Filter by location
-  if (filters.location && filters.location.trim() !== '') {
-    whereConditions.push({
-      location: { contains: filters.location.trim(), mode: 'insensitive' },
+  // Condition Filter (ProductCondition enum: NEW, USED, REFURBISHED)
+  if (filters.condition) {
+    const normalizedCondition = String(filters.condition).toUpperCase().trim();
+    if (Object.values(ProductCondition).includes(normalizedCondition as ProductCondition)) {
+      andConditions.push({ condition: normalizedCondition as ProductCondition });
+    }
+  }
+
+  // Negotiable Filter (Boolean true/false)
+  if (filters.isNegotiable !== undefined && filters.isNegotiable !== '') {
+    if (
+      filters.isNegotiable === true ||
+      String(filters.isNegotiable).toLowerCase() === 'true'
+    ) {
+      andConditions.push({ isNegotiable: true });
+    } else if (
+      filters.isNegotiable === false ||
+      String(filters.isNegotiable).toLowerCase() === 'false'
+    ) {
+      andConditions.push({ isNegotiable: false });
+    }
+  }
+
+  // Category Filter (categoryId OR relation filter via category.slug)
+  const categoryParam = (filters.category || filters.categoryId)?.toString().trim();
+  if (categoryParam) {
+    if (UUID_REGEX.test(categoryParam)) {
+      andConditions.push({
+        OR: [
+          { categoryId: categoryParam },
+          { category: { slug: categoryParam } },
+        ],
+      });
+    } else {
+      andConditions.push({
+        category: { slug: categoryParam },
+      });
+    }
+  }
+
+  // Location Filter (Case-insensitive partial match)
+  if (filters.location && typeof filters.location === 'string' && filters.location.trim() !== '') {
+    andConditions.push({
+      location: {
+        contains: filters.location.trim(),
+        mode: 'insensitive',
+      },
     });
   }
 
-  // Filter by price range
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-    const priceFilter: Prisma.DecimalFilter = {};
-    if (filters.minPrice !== undefined && filters.minPrice !== '') {
-      priceFilter.gte = new Prisma.Decimal(filters.minPrice);
-    }
-    if (filters.maxPrice !== undefined && filters.maxPrice !== '') {
-      priceFilter.lte = new Prisma.Decimal(filters.maxPrice);
-    }
-    if (priceFilter.gte !== undefined || priceFilter.lte !== undefined) {
-      whereConditions.push({ price: priceFilter });
-    }
+  // Optional sellerId filter
+  if (filters.sellerId && typeof filters.sellerId === 'string' && filters.sellerId.trim() !== '') {
+    andConditions.push({ sellerId: filters.sellerId.trim() });
   }
 
+  // Status Filter Constraints:
+  // Public queries MUST strictly filter by status: 'AVAILABLE'.
+  // Never return ARCHIVED or SOLD products to public feeds unless specifically queried by an admin or seller.
+  const isAdmin =
+    currentUser?.role === Role.ADMIN ||
+    currentUser?.role === Role.SUPER_ADMIN ||
+    currentUser?.role === 'ADMIN' ||
+    currentUser?.role === 'SUPER_ADMIN';
+
+  const isSellerQueryingOwn = Boolean(
+    currentUser?.id && filters.sellerId && filters.sellerId === currentUser.id
+  );
+
+  if (filters.status && (isAdmin || isSellerQueryingOwn)) {
+    if (filters.status !== 'ALL') {
+      const upperStatus = String(filters.status).toUpperCase().trim();
+      if (Object.values(ProductStatus).includes(upperStatus as ProductStatus)) {
+        andConditions.push({ status: upperStatus as ProductStatus });
+      } else {
+        andConditions.push({ status: ProductStatus.AVAILABLE });
+      }
+    }
+    // When 'ALL', no status condition is appended, returning all statuses for privileged query
+  } else {
+    // Strictly AVAILABLE for public feeds and unprivileged requests
+    andConditions.push({ status: ProductStatus.AVAILABLE });
+  }
+
+  // Compose dynamic Prisma ProductWhereInput
   const where: Prisma.ProductWhereInput =
-    whereConditions.length > 0 ? { AND: whereConditions } : {};
+    andConditions.length > 0 ? { AND: andConditions } : {};
 
-  // Sort configuration
-  const validSortFields = ['createdAt', 'price', 'viewsCount', 'title'];
-  const sortBy = validSortFields.includes(filters.sortBy as string)
-    ? (filters.sortBy as string)
-    : 'createdAt';
-  const sortOrder: Prisma.SortOrder = filters.sortOrder === 'asc' ? 'asc' : 'desc';
+  // Dynamic Sorting (Allowed: createdAt, price, viewsCount. Default: createdAt desc)
+  const validSortFields = ['createdAt', 'price', 'viewsCount'];
+  const sortBy =
+    filters.sortBy && validSortFields.includes(String(filters.sortBy))
+      ? String(filters.sortBy)
+      : 'createdAt';
+  const sortOrder: Prisma.SortOrder =
+    String(filters.sortOrder || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
 
+  // Run findMany and count concurrently using Promise.all for optimal performance
   const [products, total] = await Promise.all([
     prisma.product.findMany({
       where,
@@ -182,17 +256,21 @@ export const getAllProducts = async (
       take: limit,
       orderBy: { [sortBy]: sortOrder },
       include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
         seller: {
           select: {
             id: true,
             fullName: true,
             phone: true,
-            email: true,
             avatar: true,
-            area: true,
           },
         },
-        category: true,
       },
     }),
     prisma.product.count({ where }),
@@ -396,7 +474,10 @@ export const getMyProducts = async (
   const where: Prisma.ProductWhereInput = {
     sellerId,
     ...(filters.status &&
-      filters.status !== 'ALL' && { status: filters.status }),
+      filters.status !== 'ALL' &&
+      Object.values(ProductStatus).includes(String(filters.status).toUpperCase() as ProductStatus) && {
+        status: String(filters.status).toUpperCase() as ProductStatus,
+      }),
   };
 
   const [products, total] = await Promise.all([

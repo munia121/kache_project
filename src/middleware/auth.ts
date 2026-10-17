@@ -1,1 +1,1 @@
-export { verifyToken, authorize, default } from '../middlewares/auth';
+export { verifyToken, optionalAuth, authorize, default } from '../middlewares/auth';

@@ -33,15 +33,36 @@ export interface IProductFilterOptions {
   limit?: number | string;
   search?: string;
   searchTerm?: string;
+  category?: string;
   categoryId?: string;
-  condition?: ProductCondition;
-  status?: ProductStatus | 'ALL';
+  condition?: ProductCondition | string;
+  isNegotiable?: boolean | string;
+  status?: ProductStatus | 'ALL' | string;
   minPrice?: number | string;
   maxPrice?: number | string;
-  sortBy?: 'createdAt' | 'price' | 'viewsCount' | 'title';
-  sortOrder?: 'asc' | 'desc';
+  sortBy?: 'createdAt' | 'price' | 'viewsCount' | string;
+  sortOrder?: 'asc' | 'desc' | string;
   location?: string;
+  sellerId?: string;
 }
+
+export interface IProductCategoryRelation {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface IProductSellerRelation {
+  id: string;
+  fullName: string;
+  phone: string;
+  avatar: string | null;
+}
+
+export type IProductWithRelations = Product & {
+  category: IProductCategoryRelation | null;
+  seller: IProductSellerRelation;
+};
 
 export interface IPaginationMeta {
   page: number;
@@ -50,7 +71,7 @@ export interface IPaginationMeta {
   totalPage: number;
 }
 
-export interface IProductQueryResult {
+export interface IProductQueryResult<T = any> {
   meta: IPaginationMeta;
-  data: Product[];
+  data: T[];
 }

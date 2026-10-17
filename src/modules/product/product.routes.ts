@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ProductController } from './product.controller';
-import { verifyToken } from '../../middlewares/auth';
+import { verifyToken, optionalAuth } from '../../middlewares/auth';
 import { uploadProductImages } from '../../middlewares/upload';
 
 const router = Router();
@@ -24,9 +24,9 @@ router.get('/user/my-listings', verifyToken, ProductController.getMyProducts);
 /**
  * @route   GET /api/products
  * @desc    Get all active product listings with filters & pagination
- * @access  Public
+ * @access  Public (supports optional authentication for privileged admin/seller query filters)
  */
-router.get('/', ProductController.getAllProducts);
+router.get('/', optionalAuth, ProductController.getAllProducts);
 
 /**
  * @route   GET /api/products/id/:id
