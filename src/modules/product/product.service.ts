@@ -8,6 +8,8 @@ import {
   IProductFilterOptions,
   IProductQueryResult,
   IProductWithRelations,
+  IToggleFavoriteResult,
+  IFavoriteProductFilterOptions,
 } from './product.interface';
 
 /**
@@ -504,6 +506,171 @@ export const getMyProducts = async (
   };
 };
 
+/**
+ * Update product status (AVAILABLE / SOLD / ARCHIVED)
+ * Guard: only seller or ADMIN/SUPER_ADMIN can perform this action
+ */
+export const updateProductStatus = async (
+  id: string,
+  userId: string,
+  userRole: Role | string,
+  status: ProductStatus
+): Promise<Product> => {
+  const existingProduct = await prisma.product.findUnique({
+    where: { id },
+  });
+
+  if (!existingProduct) {
+    throw new AppError(404, `Product with id '${id}' not found`);
+  }
+
+  const isOwner = existingProduct.sellerId === userId;
+  const isAdmin = userRole === Role.ADMIN || userRole === Role.SUPER_ADMIN;
+
+  if (!isOwner && !isAdmin) {
+    throw new AppError(
+      403,
+      'Forbidden: Only the product seller or an admin can update the status'
+    );
+  }
+
+  const updatedProduct = await prisma.product.update({
+    where: { id },
+    data: {
+      status,
+    },
+    include: {
+      seller: {
+        select: {
+          id: true,
+          fullName: true,
+          phone: true,
+          email: true,
+          avatar: true,
+          area: true,
+        },
+      },
+      category: true,
+    },
+  });
+
+  return updatedProduct;
+};
+
+/**
+ * Toggle favorite / wishlist status for a product
+ * If previously not favorited, adds to wishlist (isFavorited: true)
+ * If previously favorited, removes from wishlist (isFavorited: false)
+ */
+export const toggleFavorite = async (
+  userId: string,
+  productId: string
+): Promise<IToggleFavoriteResult> => {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+  });
+
+  if (!product) {
+    throw new AppError(404, `Product with id '${productId}' not found`);
+  }
+
+  const existingFavorite = await prisma.wishlist.findUnique({
+    where: {
+      userId_productId: {
+        userId,
+        productId,
+      },
+    },
+  });
+
+  if (existingFavorite) {
+    await prisma.wishlist.delete({
+      where: {
+        userId_productId: {
+          userId,
+          productId,
+        },
+      },
+    });
+
+    return {
+      isFavorited: false,
+      productId,
+    };
+  }
+
+  await prisma.wishlist.create({
+    data: {
+      userId,
+      productId,
+    },
+  });
+
+  return {
+    isFavorited: true,
+    productId,
+  };
+};
+
+/**
+ * Fetch favorite products of the authenticated user with pagination
+ */
+export const getMyFavorites = async (
+  userId: string,
+  filters: IFavoriteProductFilterOptions = {}
+): Promise<IProductQueryResult> => {
+  const page = Math.max(1, Number(filters.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(filters.limit) || 10));
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.WishlistWhereInput = {
+    userId,
+  };
+
+  const [wishlistItems, total] = await Promise.all([
+    prisma.wishlist.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        product: {
+          include: {
+            seller: {
+              select: {
+                id: true,
+                fullName: true,
+                phone: true,
+                email: true,
+                avatar: true,
+                area: true,
+              },
+            },
+            category: true,
+          },
+        },
+      },
+    }),
+    prisma.wishlist.count({ where }),
+  ]);
+
+  const products = wishlistItems.map((item) => ({
+    ...item.product,
+    wishlistId: item.id,
+    favoritedAt: item.createdAt,
+  }));
+
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPage: Math.ceil(total / limit),
+    },
+    data: products,
+  };
+};
+
 export const ProductService = {
   generateSlug,
   getUniqueProductSlug,
@@ -512,8 +679,11 @@ export const ProductService = {
   getProductBySlug,
   getProductById,
   updateProduct,
+  updateProductStatus,
   deleteProduct,
   getMyProducts,
+  toggleFavorite,
+  getMyFavorites,
 };
 
 export default ProductService;

@@ -7,7 +7,7 @@ const router = Router();
 
 // ==========================================
 // Authenticated Specific Routes
-// (Placed before parameterized :slug to prevent collisions)
+// (Placed before parameterized :slug and :id to prevent collisions)
 // ==========================================
 
 /**
@@ -16,6 +16,13 @@ const router = Router();
  * @access  Authenticated (Any logged in user)
  */
 router.get('/user/my-listings', verifyToken, ProductController.getMyProducts);
+
+/**
+ * @route   GET /api/products/user/my-favorites
+ * @desc    Get favorite products belonging to the authenticated user with pagination
+ * @access  Authenticated (Any logged in user)
+ */
+router.get('/user/my-favorites', verifyToken, ProductController.getMyFavorites);
 
 // ==========================================
 // Public Routes
@@ -47,6 +54,13 @@ router.get('/:slug', ProductController.getProductBySlug);
 // ==========================================
 
 /**
+ * @route   POST /api/products/:id/favorite
+ * @desc    Toggle favorite / wishlist status for a product
+ * @access  Authenticated (Any logged in user)
+ */
+router.post('/:id/favorite', verifyToken, ProductController.toggleFavorite);
+
+/**
  * @route   POST /api/products
  * @desc    Create a new product listing (supports multipart/form-data images)
  * @access  Authenticated (Any logged in user)
@@ -56,6 +70,17 @@ router.post(
   verifyToken,
   uploadProductImages,
   ProductController.createProduct
+);
+
+/**
+ * @route   PATCH /api/products/:id/status
+ * @desc    Update product status (AVAILABLE / SOLD)
+ * @access  Authenticated (Owner or ADMIN/SUPER_ADMIN)
+ */
+router.patch(
+  '/:id/status',
+  verifyToken,
+  ProductController.updateProductStatus
 );
 
 /**

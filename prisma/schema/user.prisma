@@ -36,7 +36,8 @@ model User {
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   // Relations (pore product add korar shomoy link hobe)
-   products    Product[]
+  products  Product[]
+  wishlists Wishlist[]
 
   @@map("users")
 }

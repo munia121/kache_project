@@ -75,3 +75,13 @@ export interface IProductQueryResult<T = any> {
   meta: IPaginationMeta;
   data: T[];
 }
+
+export interface IToggleFavoriteResult {
+  isFavorited: boolean;
+  productId: string;
+}
+
+export interface IFavoriteProductFilterOptions {
+  page?: number | string;
+  limit?: number | string;
+}

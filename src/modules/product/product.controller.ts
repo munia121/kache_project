@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Role } from '@prisma/client';
+import { Role, ProductStatus } from '@prisma/client';
 import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
@@ -427,6 +427,94 @@ export const deleteProduct = catchAsync(
   }
 );
 
+/**
+ * Update product listing status (AVAILABLE / SOLD)
+ * Ownership Guard: product.sellerId === req.user.id or ADMIN/SUPER_ADMIN
+ * PATCH /api/products/:id/status
+ */
+export const updateProductStatus = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new AppError(401, 'Unauthorized access: user identity not verified');
+    }
+
+    const id = validateUUID(req.params.id);
+
+    const { status } = req.body;
+    if (!status || typeof status !== 'string' || status.trim() === '') {
+      throw new AppError(400, 'Product status is required (e.g. "AVAILABLE" or "SOLD")');
+    }
+
+    const upperStatus = status.trim().toUpperCase() as ProductStatus;
+    if (!Object.values(ProductStatus).includes(upperStatus)) {
+      throw new AppError(
+        400,
+        `Invalid status '${status}'. Allowed statuses are: ${Object.values(ProductStatus).join(', ')}`
+      );
+    }
+
+    const updatedProduct = await ProductService.updateProductStatus(
+      id,
+      req.user.id,
+      req.user.role,
+      upperStatus
+    );
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'Product status updated successfully',
+      data: updatedProduct,
+    });
+  }
+);
+
+/**
+ * Toggle favorite / wishlist status for a product
+ * POST /api/products/:id/favorite
+ */
+export const toggleFavorite = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new AppError(401, 'Unauthorized access: user identity not verified');
+    }
+
+    const id = validateUUID(req.params.id);
+    const result = await ProductService.toggleFavorite(req.user.id, id);
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: result.isFavorited
+        ? 'Product added to favorites successfully'
+        : 'Product removed from favorites successfully',
+      data: result,
+    });
+  }
+);
+
+/**
+ * Get favorite products of the authenticated user with pagination
+ * GET /api/products/user/my-favorites
+ */
+export const getMyFavorites = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    if (!req.user) {
+      throw new AppError(401, 'Unauthorized access: user identity not verified');
+    }
+
+    const result = await ProductService.getMyFavorites(req.user.id, req.query);
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'User favorite products retrieved successfully',
+      meta: result.meta,
+      data: result.data,
+    });
+  }
+);
+
 export const ProductController = {
   getAllProducts,
   getProductBySlug,
@@ -434,7 +522,10 @@ export const ProductController = {
   createProduct,
   getMyProducts,
   updateProduct,
+  updateProductStatus,
   deleteProduct,
+  toggleFavorite,
+  getMyFavorites,
 };
 
 export default ProductController;

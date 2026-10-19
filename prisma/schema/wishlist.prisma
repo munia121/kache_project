@@ -1,0 +1,17 @@
+// Wishlist / Favorite Module Schema
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId], map: "idx_wishlists_user_id")
+  @@index([productId], map: "idx_wishlists_product_id")
+  @@map("wishlists")
+}
