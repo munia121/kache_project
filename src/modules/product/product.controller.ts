@@ -10,6 +10,10 @@ import {
   ICreateProductPayload,
   IUpdateProductPayload,
 } from './product.interface';
+import {
+  createProductZodSchema,
+  updateProductZodSchema,
+} from './product.validation';
 
 /**
  * Get all product listings with filtering, search, and pagination
@@ -148,7 +152,18 @@ export const parseProductBody = (
         : trimmedCategory;
   }
 
-  // 8. Parse location
+  // 8. Parse areaId
+  if (typeof body.areaId === 'string') {
+    const trimmedArea = body.areaId.trim();
+    body.areaId =
+      trimmedArea === '' ||
+      trimmedArea === 'null' ||
+      trimmedArea === 'undefined'
+        ? null
+        : trimmedArea;
+  }
+
+  // 9. Parse location
   if (typeof body.location === 'string') {
     const trimmedLocation = body.location.trim();
     body.location =
@@ -233,6 +248,13 @@ export const createProduct = catchAsync(
 
     if (Number(price) < 0) {
       throw new AppError(400, 'Price must be a non-negative number');
+    }
+
+    if (parsedBody.areaId !== undefined && parsedBody.areaId !== null) {
+      const areaValidation = createProductZodSchema.shape.areaId.safeParse(parsedBody.areaId);
+      if (!areaValidation.success) {
+        throw new AppError(400, areaValidation.error.issues[0]?.message || 'Invalid Area ID format');
+      }
     }
 
     // Upload any attached image files to Cloudinary
@@ -339,6 +361,13 @@ export const updateProduct = catchAsync(
     if (parsedBody.price !== undefined) {
       if (isNaN(Number(parsedBody.price)) || Number(parsedBody.price) < 0) {
         throw new AppError(400, 'Price must be a non-negative number');
+      }
+    }
+
+    if (parsedBody.areaId !== undefined && parsedBody.areaId !== null) {
+      const areaValidation = updateProductZodSchema.shape.areaId.safeParse(parsedBody.areaId);
+      if (!areaValidation.success) {
+        throw new AppError(400, areaValidation.error.issues[0]?.message || 'Invalid Area ID format');
       }
     }
 

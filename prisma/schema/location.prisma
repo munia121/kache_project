@@ -1,0 +1,54 @@
+// Location Module Schema (Division, District, Area)
+
+model Division {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  bnName    String     @map("bn_name")
+  slug      String     @unique
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  districts District[]
+
+  @@map("divisions")
+}
+
+model District {
+  id         String   @id @default(uuid())
+  name       String
+  bnName     String   @map("bn_name")
+  slug       String
+  divisionId String   @map("division_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  division Division @relation(fields: [divisionId], references: [id], onDelete: Cascade)
+  areas    Area[]
+
+  @@unique([name, divisionId])
+  @@unique([slug, divisionId])
+  @@index([divisionId], map: "idx_districts_division_id")
+  @@map("districts")
+}
+
+model Area {
+  id         String   @id @default(uuid())
+  name       String
+  bnName     String   @map("bn_name")
+  slug       String
+  districtId String   @map("district_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  district District  @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  users    User[]
+  products Product[]
+
+  @@unique([name, districtId])
+  @@unique([slug, districtId])
+  @@index([districtId], map: "idx_areas_district_id")
+  @@map("areas")
+}

@@ -28,6 +28,7 @@ model User {
   
   // Hyperlocal Location Info
   area         String?    @db.VarChar(100)
+  areaId       String?    @map("area_id")
   address      String?    @db.Text
   latitude     Decimal?   @db.Decimal(10, 8)
   longitude    Decimal?   @db.Decimal(11, 8)
@@ -36,8 +37,10 @@ model User {
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
 
   // Relations (pore product add korar shomoy link hobe)
-  products  Product[]
-  wishlists Wishlist[]
+  locationArea Area?      @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  products     Product[]
+  wishlists    Wishlist[]
 
+  @@index([areaId], map: "idx_users_area_id")
   @@map("users")
 }

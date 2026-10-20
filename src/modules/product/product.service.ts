@@ -66,6 +66,15 @@ export const createProduct = async (
     }
   }
 
+  if (payload.areaId) {
+    const area = await prisma.area.findUnique({
+      where: { id: payload.areaId },
+    });
+    if (!area) {
+      throw new AppError(404, `Area with id '${payload.areaId}' not found`);
+    }
+  }
+
   const priceDecimal = new Prisma.Decimal(payload.price);
   if (priceDecimal.isNegative()) {
     throw new AppError(400, 'Price must be a non-negative number');
@@ -86,6 +95,7 @@ export const createProduct = async (
       location: payload.location ? payload.location.trim() : null,
       sellerId,
       categoryId: payload.categoryId || null,
+      areaId: payload.areaId || null,
     },
     include: {
       seller: {
@@ -99,6 +109,15 @@ export const createProduct = async (
         },
       },
       category: true,
+      area: {
+        include: {
+          district: {
+            include: {
+              division: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -204,6 +223,33 @@ export const getAllProducts = async (
     });
   }
 
+  // Cascading Location Filter (area -> district -> division by id or slug)
+  if (filters.area) {
+    andConditions.push({
+      area: {
+        OR: [{ id: filters.area }, { slug: filters.area }],
+      },
+    });
+  } else if (filters.district) {
+    andConditions.push({
+      area: {
+        district: {
+          OR: [{ id: filters.district }, { slug: filters.district }],
+        },
+      },
+    });
+  } else if (filters.division) {
+    andConditions.push({
+      area: {
+        district: {
+          division: {
+            OR: [{ id: filters.division }, { slug: filters.division }],
+          },
+        },
+      },
+    });
+  }
+
   // Optional sellerId filter
   if (filters.sellerId && typeof filters.sellerId === 'string' && filters.sellerId.trim() !== '') {
     andConditions.push({ sellerId: filters.sellerId.trim() });
@@ -273,6 +319,15 @@ export const getAllProducts = async (
             avatar: true,
           },
         },
+        area: {
+          include: {
+            district: {
+              include: {
+                division: true,
+              },
+            },
+          },
+        },
       },
     }),
     prisma.product.count({ where }),
@@ -323,6 +378,15 @@ export const getProductBySlug = async (slug: string): Promise<Product> => {
         },
       },
       category: true,
+      area: {
+        include: {
+          district: {
+            include: {
+              division: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -348,6 +412,15 @@ export const getProductById = async (id: string): Promise<Product> => {
         },
       },
       category: true,
+      area: {
+        include: {
+          district: {
+            include: {
+              division: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -356,6 +429,16 @@ export const getProductById = async (id: string): Promise<Product> => {
   }
 
   return product;
+};
+
+/**
+ * Fetch a single product by identifier (UUID or slug) with nested area -> district -> division
+ */
+export const getSingleProduct = async (identifier: string): Promise<Product> => {
+  if (UUID_REGEX.test(identifier)) {
+    return await getProductById(identifier);
+  }
+  return await getProductBySlug(identifier);
 };
 
 /**
@@ -379,6 +462,15 @@ export const updateProduct = async (
     });
     if (!category) {
       throw new AppError(404, `Category with id '${payload.categoryId}' not found`);
+    }
+  }
+
+  if (payload.areaId !== undefined && payload.areaId !== null) {
+    const area = await prisma.area.findUnique({
+      where: { id: payload.areaId },
+    });
+    if (!area) {
+      throw new AppError(404, `Area with id '${payload.areaId}' not found`);
     }
   }
 
@@ -414,6 +506,7 @@ export const updateProduct = async (
         location: payload.location ? payload.location.trim() : null,
       }),
       ...(payload.categoryId !== undefined && { categoryId: payload.categoryId }),
+      ...(payload.areaId !== undefined && { areaId: payload.areaId }),
     },
     include: {
       seller: {
@@ -427,6 +520,15 @@ export const updateProduct = async (
         },
       },
       category: true,
+      area: {
+        include: {
+          district: {
+            include: {
+              division: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -676,6 +778,7 @@ export const ProductService = {
   getUniqueProductSlug,
   createProduct,
   getAllProducts,
+  getSingleProduct,
   getProductBySlug,
   getProductById,
   updateProduct,

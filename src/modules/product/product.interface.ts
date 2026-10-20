@@ -1,4 +1,12 @@
-import { Product, ProductCondition, ProductStatus, Prisma } from '@prisma/client';
+import {
+  Product,
+  ProductCondition,
+  ProductStatus,
+  Prisma,
+  Area,
+  District,
+  Division,
+} from '@prisma/client';
 
 export type IProduct = Product;
 
@@ -12,6 +20,7 @@ export interface ICreateProductPayload {
   images?: string[];
   location?: string | null;
   categoryId?: string | null;
+  areaId?: string | null;
   replaceImages?: boolean;
 }
 
@@ -25,6 +34,7 @@ export interface IUpdateProductPayload {
   images?: string[];
   location?: string | null;
   categoryId?: string | null;
+  areaId?: string | null;
   replaceImages?: boolean;
 }
 
@@ -44,6 +54,9 @@ export interface IProductFilterOptions {
   sortOrder?: 'asc' | 'desc' | string;
   location?: string;
   sellerId?: string;
+  division?: string;
+  district?: string;
+  area?: string;
 }
 
 export interface IProductCategoryRelation {
@@ -59,9 +72,16 @@ export interface IProductSellerRelation {
   avatar: string | null;
 }
 
+export type IProductLocationRelation = Area & {
+  district: District & {
+    division: Division;
+  };
+};
+
 export type IProductWithRelations = Product & {
   category: IProductCategoryRelation | null;
   seller: IProductSellerRelation;
+  area?: IProductLocationRelation | null;
 };
 
 export interface IPaginationMeta {
