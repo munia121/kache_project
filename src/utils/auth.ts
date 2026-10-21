@@ -5,10 +5,13 @@ import config from '../config';
 /**
  * Hash a plain password string using bcryptjs
  * @param password Plain text password
+ * @param saltRounds Number of bcrypt salt rounds (default: 10)
  * @returns Promise<string> Hashed password
  */
-export const hashPassword = async (password: string): Promise<string> => {
-  const saltRounds = 10;
+export const hashPassword = async (
+  password: string,
+  saltRounds: number = 10
+): Promise<string> => {
   return await bcrypt.hash(password, saltRounds);
 };
 
