@@ -64,10 +64,37 @@ export const myListingsQueryZodSchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional().default(10),
 });
 
+/**
+ * Zod validation schema for "Become a Seller" onboarding
+ * - termsAccepted: boolean (must be strictly true)
+ * - shopName: optional string
+ * - bio: optional string
+ */
+export const becomeSellerZodSchema = z.object({
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({
+      message: 'You must accept the terms and conditions (termsAccepted must be true) to become a seller',
+    }),
+  }),
+  shopName: z
+    .string({ invalid_type_error: 'Shop name must be a string' })
+    .trim()
+    .max(150, 'Shop name cannot exceed 150 characters')
+    .optional()
+    .nullable(),
+  bio: z
+    .string({ invalid_type_error: 'Bio must be a string' })
+    .trim()
+    .max(1000, 'Bio cannot exceed 1000 characters')
+    .optional()
+    .nullable(),
+});
+
 export const UserValidation = {
   updateProfileZodSchema,
   changePasswordZodSchema,
   myListingsQueryZodSchema,
+  becomeSellerZodSchema,
 };
 
 export default UserValidation;

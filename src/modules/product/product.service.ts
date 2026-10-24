@@ -1,4 +1,4 @@
-import { Product, ProductCondition, ProductStatus, Prisma, Role } from '@prisma/client';
+import { Product, ProductCondition, ProductStatus, Prisma, UserRole } from '@prisma/client';
 import prisma from '../../config/prismaClient';
 import AppError from '../../errors/AppError';
 import { UUID_REGEX } from '../../utils/validateUUID';
@@ -57,6 +57,23 @@ export const createProduct = async (
   sellerId: string,
   payload: ICreateProductPayload
 ): Promise<Product> => {
+  // Secondary safety check: verify seller.role !== 'USER' before creating product record
+  const seller = await prisma.user.findUnique({
+    where: { id: sellerId },
+    select: { id: true, role: true },
+  });
+
+  if (!seller) {
+    throw new AppError(404, 'Seller user not found');
+  }
+
+  if (seller.role === UserRole.USER || (seller.role as string) === 'USER') {
+    throw new AppError(
+      403,
+      'Regular users cannot post products. You must complete seller onboarding first to post ads.'
+    );
+  }
+
   if (payload.categoryId) {
     const category = await prisma.category.findUnique({
       where: { id: payload.categoryId },
@@ -129,7 +146,7 @@ export const createProduct = async (
  */
 export const getAllProducts = async (
   filters: IProductFilterOptions = {},
-  currentUser?: { id?: string; role?: Role | string }
+  currentUser?: { id?: string; role?: UserRole | string }
 ): Promise<IProductQueryResult<IProductWithRelations>> => {
   // 1. Standardized Pagination (default: page 1, limit 10, max cap: 50)
   const page = Math.max(1, parseInt(String(filters.page || 1), 10) || 1);
@@ -259,8 +276,8 @@ export const getAllProducts = async (
   // Public queries MUST strictly filter by status: 'AVAILABLE'.
   // Never return ARCHIVED or SOLD products to public feeds unless specifically queried by an admin or seller.
   const isAdmin =
-    currentUser?.role === Role.ADMIN ||
-    currentUser?.role === Role.SUPER_ADMIN ||
+    currentUser?.role === UserRole.ADMIN ||
+    currentUser?.role === UserRole.SUPER_ADMIN ||
     currentUser?.role === 'ADMIN' ||
     currentUser?.role === 'SUPER_ADMIN';
 
@@ -615,7 +632,7 @@ export const getMyProducts = async (
 export const updateProductStatus = async (
   id: string,
   userId: string,
-  userRole: Role | string,
+  userRole: UserRole | string,
   status: ProductStatus
 ): Promise<Product> => {
   const existingProduct = await prisma.product.findUnique({
@@ -627,7 +644,7 @@ export const updateProductStatus = async (
   }
 
   const isOwner = existingProduct.sellerId === userId;
-  const isAdmin = userRole === Role.ADMIN || userRole === Role.SUPER_ADMIN;
+  const isAdmin = userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN;
 
   if (!isOwner && !isAdmin) {
     throw new AppError(

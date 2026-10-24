@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Role, ProductStatus } from '@prisma/client';
+import { UserRole, ProductStatus } from '@prisma/client';
 import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
@@ -58,6 +58,7 @@ export const getProductBySlug = catchAsync(
   }
 );
 
+
 /**
  * Get product listing by UUID
  * GET /api/products/id/:id
@@ -75,6 +76,31 @@ export const getProductById = catchAsync(
     });
   }
 );
+
+/**
+ * Get product listing by UUID or slug
+ * GET /api/products/:id or GET /api/products/:slug
+ */
+export const getSingleProduct = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const rawParam = req.params.id || req.params.slug;
+    const identifier = Array.isArray(rawParam) ? rawParam[0] : rawParam;
+
+    if (!identifier || typeof identifier !== 'string' || identifier.trim() === '') {
+      throw new AppError(400, 'Product identifier parameter is required');
+    }
+
+    const product = await ProductService.getSingleProduct(identifier.trim());
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'Product retrieved successfully',
+      data: product,
+    });
+  }
+);
+
 
 /**
  * Create a new product listing
@@ -331,7 +357,7 @@ export const updateProduct = catchAsync(
 
     const isOwner = existingProduct.sellerId === req.user.id;
     const isAdmin =
-      req.user.role === Role.ADMIN || req.user.role === Role.SUPER_ADMIN;
+      req.user.role === UserRole.ADMIN || req.user.role === UserRole.SUPER_ADMIN;
 
     if (!isOwner && !isAdmin) {
       throw new AppError(
@@ -433,7 +459,7 @@ export const deleteProduct = catchAsync(
 
     const isOwner = existingProduct.sellerId === req.user.id;
     const isAdmin =
-      req.user.role === Role.ADMIN || req.user.role === Role.SUPER_ADMIN;
+      req.user.role === UserRole.ADMIN || req.user.role === UserRole.SUPER_ADMIN;
 
     if (!isOwner && !isAdmin) {
       throw new AppError(
@@ -548,6 +574,7 @@ export const ProductController = {
   getAllProducts,
   getProductBySlug,
   getProductById,
+  getSingleProduct,
   createProduct,
   getMyProducts,
   updateProduct,

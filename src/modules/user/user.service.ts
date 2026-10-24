@@ -1,4 +1,4 @@
-import { Prisma, ProductStatus } from '@prisma/client';
+import { Prisma, ProductStatus, UserRole } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import prisma from '../../config/prismaClient';
 import redis from '../../config/redis';
@@ -9,6 +9,7 @@ import {
   IMyListingsFilterOptions,
   IMyListingsResult,
   IUserProfileResponse,
+  IBecomeSellerPayload,
 } from './user.interface';
 
 /**
@@ -213,11 +214,79 @@ export const getMyListings = async (
   };
 };
 
+/**
+ * Become a seller onboarding workflow
+ * - Checks current role: if already SELLER or ADMIN (or SUPER_ADMIN), throws 400 "You are already a registered seller"
+ * - Prerequisite check: verifies user has verified phone or saved areaId, else throws 400 "Please set your default location and verify your phone number before becoming a seller"
+ * - Updates role = 'SELLER' and optional shopName/bio
+ * - Returns updated user object (excluding passwordHash) with populated locationArea hierarchy
+ */
+export const becomeSeller = async (
+  userId: string,
+  payload: IBecomeSellerPayload
+): Promise<IUserProfileResponse> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: locationHierarchyInclude,
+  });
+
+  if (!user) {
+    throw new AppError(404, 'User profile not found');
+  }
+
+  // Check current role: If already SELLER or ADMIN (or SUPER_ADMIN)
+  if (
+    user.role === UserRole.SELLER ||
+    user.role === UserRole.ADMIN ||
+    user.role === UserRole.SUPER_ADMIN ||
+    (user.role as string) === 'SELLER' ||
+    (user.role as string) === 'ADMIN' ||
+    (user.role as string) === 'SUPER_ADMIN'
+  ) {
+    throw new AppError(400, 'You are already a registered seller');
+  }
+
+  // Prerequisite check: Verify the user has a verified phone number or a saved areaId (home location)
+  const hasPhone = Boolean(user.phone && user.phone.trim());
+  const hasAreaId = Boolean(user.areaId);
+
+  if (!hasPhone && !hasAreaId) {
+    throw new AppError(
+      400,
+      'Please set your default location and verify your phone number before becoming a seller'
+    );
+  }
+
+  const updateData: Prisma.UserUpdateInput = {
+    role: UserRole.SELLER,
+  };
+
+  if (payload.shopName !== undefined && payload.shopName !== null) {
+    updateData.shopName = payload.shopName.trim();
+  }
+
+  if (payload.bio !== undefined && payload.bio !== null) {
+    updateData.bio = payload.bio.trim();
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: updateData,
+    include: locationHierarchyInclude,
+  });
+
+  // Strip sensitive password hash
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { passwordHash, ...safeUser } = updatedUser;
+  return safeUser;
+};
+
 export const UserService = {
   getMyProfile,
   updateProfile,
   changePassword,
   getMyListings,
+  becomeSeller,
 };
 
 export default UserService;

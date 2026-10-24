@@ -1,7 +1,9 @@
+import { UserRole } from '@prisma/client';
+
 export interface IAuthUser {
   id: string;
   phone: string;
-  role: string;
+  role: UserRole | string;
   email?: string | null;
   [key: string]: any;
 }

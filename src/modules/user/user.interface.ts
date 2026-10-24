@@ -1,7 +1,7 @@
-import { User, Role, Prisma, Area, District, Division, Product } from '@prisma/client';
+import { User, UserRole, Prisma, Area, District, Division, Product } from '@prisma/client';
 
 export type IUser = User;
-export { Role };
+export { UserRole, UserRole as Role };
 export type IUserCreate = Prisma.UserCreateInput;
 export type IUserUpdate = Prisma.UserUpdateInput;
 
@@ -20,6 +20,15 @@ export interface ILocationAreaHierarchy extends Area {
 export type IUserProfileResponse = Omit<User, 'passwordHash'> & {
   locationArea?: ILocationAreaHierarchy | null;
 };
+
+/**
+ * Payload for becoming a seller
+ */
+export interface IBecomeSellerPayload {
+  termsAccepted: boolean;
+  shopName?: string | null;
+  bio?: string | null;
+}
 
 /**
  * Payload for updating profile information

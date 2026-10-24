@@ -43,5 +43,12 @@ router.get('/profile/my-listings', auth, UserController.getMyListings);
  */
 router.patch('/profile', auth, UserController.updateProfile);
 
+/**
+ * @route   PATCH /api/users/become-seller
+ * @desc    Onboard regular user as a seller
+ * @access  Protected (Authenticated user)
+ */
+router.patch('/become-seller', auth, UserController.becomeSeller);
+
 export const UserRoutes = router;
 export default router;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { ProductController } from './product.controller';
-import { verifyToken, optionalAuth } from '../../middlewares/auth';
+import { verifyToken, auth, authorizeRoles, optionalAuth } from '../../middlewares/auth';
 import { uploadProductImages } from '../../middlewares/upload';
 
 const router = Router();
@@ -43,6 +43,13 @@ router.get('/', optionalAuth, ProductController.getAllProducts);
 router.get('/id/:id', ProductController.getProductById);
 
 /**
+ * @route   GET /api/products/:id
+ * @desc    Get product details by UUID or slug
+ * @access  Public
+ */
+router.get('/:id', ProductController.getSingleProduct);
+
+/**
  * @route   GET /api/products/:slug
  * @desc    Get product details by unique slug (auto increments viewsCount)
  * @access  Public
@@ -63,11 +70,12 @@ router.post('/:id/favorite', verifyToken, ProductController.toggleFavorite);
 /**
  * @route   POST /api/products
  * @desc    Create a new product listing (supports multipart/form-data images)
- * @access  Authenticated (Any logged in user)
+ * @access  Authenticated (SELLER, ADMIN)
  */
 router.post(
   '/',
-  verifyToken,
+  auth(),
+  authorizeRoles('SELLER', 'ADMIN'),
   uploadProductImages,
   ProductController.createProduct
 );

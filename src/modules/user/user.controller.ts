@@ -8,6 +8,7 @@ import {
   updateProfileZodSchema,
   changePasswordZodSchema,
   myListingsQueryZodSchema,
+  becomeSellerZodSchema,
 } from './user.validation';
 
 /**
@@ -139,11 +140,45 @@ export const getMyListings = catchAsync(
   }
 );
 
+/**
+ * Onboard regular user as a seller
+ * PATCH /api/users/become-seller
+ */
+export const becomeSeller = catchAsync(
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError(401, 'Unauthorized access: user identity not verified');
+    }
+
+    const validationResult = becomeSellerZodSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      const errorMsg = validationResult.error.issues
+        .map((issue) => issue.message)
+        .join(', ');
+      throw new AppError(400, errorMsg);
+    }
+
+    const updatedUser = await UserService.becomeSeller(
+      userId,
+      validationResult.data
+    );
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'Seller onboarding completed successfully. You can now post products.',
+      data: updatedUser,
+    });
+  }
+);
+
 export const UserController = {
   getMyProfile,
   updateProfile,
   changePassword,
   getMyListings,
+  becomeSeller,
 };
 
 export default UserController;

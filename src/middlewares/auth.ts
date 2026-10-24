@@ -1,9 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
-import { Role, UserStatus } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 import AppError from '../errors/AppError';
 import catchAsync from '../utils/catchAsync';
 import { verifyJwtToken } from '../utils/auth';
 import prisma from '../config/prismaClient';
+
+export { UserRole, UserRole as Role };
 
 /**
  * Middleware to verify JWT token from Authorization header
@@ -59,15 +61,58 @@ export const verifyToken = catchAsync(
 );
 
 /**
- * Middleware to restrict access based on user role
+ * Express middleware to authenticate user via JWT token.
+ * Can be used directly as `auth` or invoked as `auth()` in route definitions.
  */
-export const authorize = (...roles: (Role | string)[]) => {
+export const auth: any = ((...args: any[]) => {
+  if (args.length >= 3 && args[0]?.headers) {
+    return (verifyToken as any)(args[0], args[1], args[2]);
+  }
+  return verifyToken;
+}) as any;
+
+/**
+ * Strict role-based authorization guard
+ * Restricts access to specified UserRoles.
+ * If user role is USER (or not in allowed roles), immediately blocks execution with 403 Forbidden:
+ * { statusCode: 403, success: false, message: "Regular users cannot post products. You must complete seller onboarding first to post ads." }
+ */
+export const authorizeRoles = (...roles: (UserRole | string)[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       throw new AppError(401, 'Unauthorized access: user identity not verified');
     }
 
-    if (roles.length > 0 && !roles.includes(req.user.role as Role)) {
+    const userRole = req.user.role;
+
+    if (roles.length > 0 && !roles.includes(userRole as UserRole)) {
+      if (userRole === UserRole.USER || userRole === 'USER') {
+        throw new AppError(
+          403,
+          'Regular users cannot post products. You must complete seller onboarding first to post ads.'
+        );
+      }
+
+      throw new AppError(
+        403,
+        'Regular users cannot post products. You must complete seller onboarding first to post ads.'
+      );
+    }
+
+    next();
+  };
+};
+
+/**
+ * Middleware to restrict access based on user role (general authorize)
+ */
+export const authorize = (...roles: (UserRole | string)[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      throw new AppError(401, 'Unauthorized access: user identity not verified');
+    }
+
+    if (roles.length > 0 && !roles.includes(req.user.role as UserRole)) {
       throw new AppError(403, 'Forbidden: You do not have permission to perform this action');
     }
 

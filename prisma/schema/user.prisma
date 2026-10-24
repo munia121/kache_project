@@ -1,5 +1,6 @@
-enum Role {
+enum UserRole {
   USER
+  SELLER
   ADMIN
   SUPER_ADMIN
 
@@ -21,11 +22,14 @@ model User {
   phone        String     @unique @db.VarChar(20)
   email        String?    @unique @db.VarChar(255)
   passwordHash String     @map("password_hash") @db.VarChar(255)
-  role         Role       @default(USER)
+  role         UserRole   @default(USER)
   status       UserStatus @default(ACTIVE)
   avatar       String?    @db.VarChar(255)
   isEmailVerified Boolean @default(false) @map("is_email_verified")
   
+  shopName     String?    @map("shop_name") @db.VarChar(150)
+  bio          String?    @db.Text
+
   // Hyperlocal Location Info
   area         String?    @db.VarChar(100)
   areaId       String?    @map("area_id")

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Request, Response } from 'express';
-import { Role, UserStatus } from '@prisma/client';
+import { UserRole, UserStatus } from '@prisma/client';
 import prisma from '../../config/prismaClient';
 import AppError from '../../errors/AppError';
 import catchAsync from '../../utils/catchAsync';
@@ -72,7 +72,7 @@ export const register = catchAsync(async (req: Request, res: Response): Promise<
       phone: normalizedPhone,
       email: normalizedEmail,
       passwordHash,
-      role: Role.USER,
+      role: UserRole.USER,
       status: UserStatus.ACTIVE,
       isEmailVerified: false,
       area: area ? String(area).trim() : null,
